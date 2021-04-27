@@ -1,0 +1,143 @@
+\documentclass[]{scrartcl}
+
+%opening
+\title{Apuntes programación CUDA}
+\author{Mauricio Vanzulli}
+\usepackage{graphicx}
+\begin{document}
+
+\maketitle
+
+
+\section{Clase 1 CUDA}
+
+Características del device:
+
+\begin{itemize}
+	\item Es un coprocesador de la CPU
+	\item Posee una memoria DRAM
+	\item Ejecuta muchos threads en paralelo.
+	\item Cada mutli-procesador procesa un bloque con un programa único (kernel) en muchos hilos. Cada CUDA-core procesa muchos hilos, uno a la vez.
+	\item Este paradigma de programación recibe la sigla SPMT (single program multiple threads).
+	\item Cada kernel ejecuta un array de hilos, es importante el identificador de hilo respecto al dato al que se le quiere ejecutar el kernel.
+\end{itemize}
+
+Algoritmo básico de programación
+\begin{enumerate}
+	\item Instrucciones en el host.
+	\item Enviar los datos al device.
+	\item Procesa en GPU
+	\item Recuperar los datos de la GPU.
+	\item Continuar procesamiento en el host.
+\end{enumerate}
+
+Existe determinada jerarquía de threads. Una grilla en 3D agrupa un conjunto de bloques y dentro de cada bloque se tienen múltiples hilos también en 3D. No se puede asumir a priori que el bloque 1 se ejecute antes del 2.
+
+\pagebreak
+Las funciones en CUDA 
+
+
+\begin{table}[ht]
+	\begin{tabular}{|l|l|l|ll}
+		\cline{1-3}
+		\textit{Dominio de funciones} & \textit{Ejecuta en:} & \textit{Se invoca desde:} & \textit{} &  \\ \cline{1-3}
+		\_\_device\_\_   & device               & device                    &           &  \\ \cline{1-3}
+		\_\_global\_\_   & device               & host                      &           &  \\ \cline{1-3}
+		\_\_host\_\_     & host                 & hostt                     &           &  \\ \cline{1-3}
+	\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+	\resizebox{\textwidth}{!}{%
+		\begin{tabular}{|l|l|l|ll}
+			\cline{1-3}
+			\textit{Función}                                                                                                          & \textit{Variables de entrada:}                                                             & \textit{Proposito:}                                & \textit{} &  \\ \cline{1-3}
+			dim3 DimGrid                                                                                                              & (Cant\_Bloq\_x,Cant\_Bloq\_y,Cant\_Bloq\_z)                                                & Crea una grilla de esas dimensio de bloques        &           &  \\ \cline{1-3}
+			dim3 DimBlock                                                                                                             & \begin{tabular}[c]{@{}l@{}}(Cant\_Hilos\_x,\\ Cant\_Hilos\_y, Cant\_Hilos\_z)\end{tabular} & Crea las dimensiones de los threads en cada bloque &           &  \\ \cline{1-3}
+			KernelFunc \textless{}\textless{}\textless DimGrid,DimBlock,SharedMemBytes\textgreater{}\textgreater{}\textgreater{}(...) & Input Kernel, grilla, y memoria compartida                                                 & Ejecuta el kernel en device                        &           &  \\ \cline{1-3}
+		\end{tabular}%
+	}
+\end{table}
+
+Se disponen de distintos espacios de memoria:
+
+\begin{itemize}
+	\item \_\_global\_\_ : memoria global en el host
+	\item \_\_device\_\_ : memoria global en device	
+	\item \_\_shared\_\_ : reside en la memoria compartida host-device (se usa para allocamiento dinámico)
+	\item \_\_constant\_\_ reside en momoria cosntante del device (allocamiento estático)
+	\
+\end{itemize}
+
+Localizadores de hilos y bloques:
+
+\begin{itemize}
+	\item threadIdx :Ubicación de ese thread y se accede con .x .y .z
+	\item blockIdx  :Ubicación del bloque en el que me encuentro y se acccede con .x .y .z 
+	\item blockDim : Tamaño del bloque (en cantidad de hilos) y se accede con .x .y .z
+	\item gridDim :Tamaño de la grilla (en cantidad de blques)y se accede con .x .y .z
+\end{itemize}
+
+Funciones intrínsecas al GPU
+
+
+\begin{itemize}
+	\item cudaDeviceSynchronize :Sincroniza todos hilos en el device y se ejecuta desde el host. 
+	\item \_\_syncthreads  :Permite sincronizar los threads de un mismo bloque. 
+	\item cudaClock y otro miden tiempos
+\end{itemize}
+
+Reservar memoria en la tarjeta y transferir datos es fundamental para comunicar las datos y sus procesamientos, esto es bastante costoso en términos computacionales. Me interesa comunicar host-cpu (se ejecutan desde el CPU):
+\begin{itemize}
+	\item cudaMalloc(Puntero,Tamaño de memoria) Reserva memoria en la global memory de la GPU
+	\item cudaFree (Puntero) libera el espacio reservado
+	\item cudaMemcpy (Puntero de destino, puntero origen,numero de bytes a copiar, Tipo de transferencia) . Los diferentes tipos de transferencia son:  Host 2 Device (cudaMemcpyHostToDevice), Device 2 Host(cudaMemcpyDeviceToHost). Además están (Host 2 Host) y Device 2 Device.
+	\item cudaMemSet (Variable a iniciar,0 o 1, sizevector): Setea el inicio del vector en el device.
+\end{itemize}
+
+\paragraph{La clave es la relación entre los identificadores y los particionamientos de datos}
+\paragraph{Si en el kernel el procesamiento no depende del thread puede haber problemas de condición de carrera... para solucionar esto se usa atomicadd} Esto sucede cuando mas de un hilo deben escribir a la misma entrada de memoria golbal. Osea dentro de un mismo warp múltiples hilos deben escribir en el mismo lugar, ¿cuál escribe primero?, hace falta ordenarlos serialmente. Este tipo de problemas se llama racecondition y CUDA escribe unicamente un hilo aleatorio. 
+
+
+
+
+\section{Clase 2 CUDA}
+El acceso a memoria global es donde se encuentra el cuello de botella, el proceso más costos en términos computacionales la transferencia de datos de la CPU al device y luego del device a CPU, es importante realizar esta transferencia de forma eficiente. 
+
+\paragraph{Memoria Coalesced}
+Acceso "coalesced" a memoria global: Consiste en fusionar los accesos a memorias de un warp (conjunto de hilos) para optimizar la petición a memoria. Si cada hilo necesita un dato contiguo a otro en memoria en vez de realizar dos accesos, los une en uno solo. 
+\begin{itemize}
+	\item El acceso a memoria global es por segmentos incluso cuando se quiere leer una palabra. A veces esos datos no son útiles y se desperdicia el ancho de banda. También sucede en CPU pero el cache y el preload vulneran estos problemas intrínsecamente."Cuando se solicita una dirección del segmento me devuelve todo el segmento" 
+	\item Los segmentos están alineados en múltiplos de 128 bytes. "Me traigo trozos o bloques de 128 bytes". Además estos segmentos están fijos.
+	\item Es necesario utilizar Structs of Array. Osea si quiero guardar múltiples datos del mismo objeto guardo los arrays de eses datos para los múltiples entes. Como los arrays son secuenciales se puede utilizar el coalessed, contrario a lo que sucede con Array of Structs
+\end{itemize}
+
+En la memoria global queremos que cada lectura utiliza la mayor cantidad de datos en cada ejecución. En el caso de memoria compartida es deseable que cada bloque use la mayor cantidad de memoria
+\paragraph{Memoria Compartida}
+Un mismo bloque dispone de una memoria compartida en el multi-procesador que se ejecuta. Esto se tiene que especificar en el kernel y cuando termine de ejecutar ese bloque hay que copiarlos a la memoria global ya que sino mueren con su bloque. Esta memoria se usa como una especie de cache, permite evitar accesos no coalesced a la memoria global. Se copia de forma coalessed de la global y luego se accede de forma desordenada en la memoria compartida.  
+
+Cuando se invoca al kernel hay que hacer referencia a que cantidad de memoria compartida se quiere reservar en memoria Funcion<<Dim Grid,Dim BLoc, Tamaño de memoria compartida>>(output, input)
+
+Puede existir un problema cuando en un ciclo de reloj los hilos no pegan en bancos distintos puede suceder que: dos hilos traten del leer el mismo dato de banco tenemos un bank conflict. La clave es que el indice de acceso a banco sea con mod impar en módulo 32(cantidad de bytes por banco). Resumen:
+
+\begin{itemize}
+	\item No hay confitico y el acceso es rápido cundo:
+	\begin{enumerate}
+		\item Todos los hilos del warp acceden a diferentes bancos.
+		\item Todos los hilos del warp leen la misma palabra de un banco.
+	\end{enumerate}
+	\item El acceso es ineficiente cuando:
+		\begin{enumerate}
+		\item Varios hilos del warp acceden a parlabas diferentes del mismo banco.
+		\item Se produce un conflicto y se debe serializar el acceso.
+		\item Se requieren tantos ciclos como el numero máximo de accesos al mismo banco.
+	\end{enumerate}
+\end{itemize}
+
+
+
+
+
+
+
+\end{document}
