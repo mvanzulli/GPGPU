@@ -9,7 +9,7 @@
 \maketitle
 
 
-\section{Clase 1 CUDA}
+\section{Clase de CUDA}
 
 Características del device:
 
@@ -101,7 +101,7 @@ Reservar memoria en la tarjeta y transferir datos es fundamental para comunicar 
 
 
 
-\section{Clase 2 CUDA}
+\section{Clase de CUDA}
 El acceso a memoria global es donde se encuentra el cuello de botella, el proceso más costos en términos computacionales la transferencia de datos de la CPU al device y luego del device a CPU, es importante realizar esta transferencia de forma eficiente. 
 
 \paragraph{Memoria Coalesced}
@@ -116,9 +116,9 @@ En la memoria global queremos que cada lectura utiliza la mayor cantidad de dato
 \paragraph{Memoria Compartida}
 Un mismo bloque dispone de una memoria compartida en el multi-procesador que se ejecuta. Esto se tiene que especificar en el kernel y cuando termine de ejecutar ese bloque hay que copiarlos a la memoria global ya que sino mueren con su bloque. Esta memoria se usa como una especie de cache, permite evitar accesos no coalesced a la memoria global. Se copia de forma coalessed de la global y luego se accede de forma desordenada en la memoria compartida.  
 
-Cuando se invoca al kernel hay que hacer referencia a que cantidad de memoria compartida se quiere reservar en memoria Funcion<<Dim Grid,Dim BLoc, Tamaño de memoria compartida>>(output, input)
+Cuando se invoca al kernel hay que hacer referencia a que cantidad de memoria compartida se quiere reservar en memoria Función<<Dim Grid,Dim BLoc, Tamaño de memoria compartida>>(output, input)
 
-Puede existir un problema cuando en un ciclo de reloj los hilos no pegan en bancos distintos puede suceder que: dos hilos traten del leer el mismo dato de banco tenemos un bank conflict. La clave es que el indice de acceso a banco sea con mod impar en módulo 32(cantidad de bytes por banco). Resumen:
+Puede existir un problema cuando en un ciclo de reloj los hilos no pegan en bancos distintos puede suceder que: dos hilos traten del leer el mismo dato de banco tenemos un bank conflict. La clave es que el indice de acceso a banco sea con modo impar en módulo 32(cantidad de bytes por banco). Resumen:
 
 \begin{itemize}
 	\item No hay confitico y el acceso es rápido cundo:
@@ -133,11 +133,36 @@ Puede existir un problema cuando en un ciclo de reloj los hilos no pegan en banc
 		\item Se requieren tantos ciclos como el numero máximo de accesos al mismo banco.
 	\end{enumerate}
 \end{itemize}
+En general cuando se utiliza memoria compartida sebe utilizarse stncthreads() para garantizar que todos los hilos completaron determinada operación. En general cuando se quiere bajar a memoria global determinado algoritmo es importante implementar el syncthreads que garantiza que la transferencia se realiza cuanto dos los hilos del bloque finalizaron sus acciones. 
+\paragraph{Transferencias a memoria}
+Para hacer una transferencia es necesario que la memoria sea no paginable (estable y no tomado el control por el SO). La memoria paginable hace funcionar la memoria virtual porque cuando se ejecuta una nueva aplicación el SO copia esos datos de memoria paginable al disco y luego vuelve a cargarlas. La transferencia a GPU debe ser no paginable ya que la CPU no debe tocarla. Cuando se ejecuta cudaMemCpy() se copia de paginable a no paginable y luego a la memoria global de la GPU. Para eso se usa cudaHostAlloc, pero este bloque la memoria no paginable.
 
+cudaHostAlloc reserva memoria no paginable para nuestra aplicación, no obstante los recursos no paginables son limitados. 
 
+Se puede separar el plano físico con el estado lógico. Osea hacer una única transferencia física y luego particionar esos datos con la lógica. 
 
+\paragraph{Patrones de cómputo}
 
+Este es una representación gráfica de como fluctua una determinada variable. La resolución se puede realizar mediante los siguientes mecanismos:
 
+\begin{enumerate}
+	\item Acceso coalesced
+	\item Operaciones atómicas
+	\item Privatization
+\end{enumerate}
 
+Cada hilo tiene su propio registro donde se guardan las variables que ejecuta cada hilo, esto se localiza en cada MP nivel de hardware. Si diferentes hilos tienen que escribir en el mismo dato hay problemas de condición de carrera (depende de cual realiza primero la instrucción el resultado final). Se puede asegurar la ejecución como un ploque para que no sucedan lecturas o escrituras en simultano por diferentes bloques que trabajan con el mismo dato.
+\subparagraph{attomicAdd}
+La función \emph{attomicAdd} condensa una operación de escritura, modificación y lectura y hasta que ese hilo no finalice esa dirección en memoria el resto no puden alterar esa dirección. Esta recibe un puntero a int y un valor y almacena el valor en int, devolviendo el valor leído. Esto tiene un problema ya que toma desmasiado tiempo de latencia entre una opreación y otra, esto no ocurre en la memoria local. Para esto se usa privatization:
 
+El objetivo es que cada bloque tenga su propia memoria, soluciona cuando cada bloque intenta escribir en momia global con una opreación de attomic. Esto causa demasiado overhead. Cada bloque construye su propia salida en la memoria local y luego los bloques lo escriben en memoria global con attomicAdd. 
+
+\subparagraph{Reduce}
+Si se quiere reducir por ejemplo el módulo, osea esto ocurre cuando los datos de entradas son enormes pero la salidas son pocas. Por ejemplo suma de un vector. 
+
+Consiste realizar resultados intermedios en GPU en memoria compartida para luego compactar todo en una operación en memoria global.
+  
+Para reservar memoria compartida se pude hacer con $\_\_shared\_\_$ tipo y la variable y cantidad de bytes. O $extern\_\_shared\_\_$ que cuando se llama al kernel se indica que tamaño de memoria que deseamos reservar para su ejecución. 
+
+El $syncthreads$ sincorniza y garatniza que todos los hilos hayan terminado esas operaciones antes de avanzar en el códiog. Un error ocurre si se ejecuta el $syncthreads$ dentro de una codnción condicional porque no va a entrar y va a quedar esperando que todos terminen y esto nunca sucede. 
 \end{document}

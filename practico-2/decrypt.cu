@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 
 	// Parte a y c:
 	if (parte == 1 || parte == 3) {
-		nb = 128;
+		nb = 16;
 	// parte b:
 	} else if (parte == 2) {
 		if (length % n == 0 ){
@@ -165,7 +165,9 @@ void read_file(const char * fname, int* input)
 	int c; 
 	while ((c = getc(f)) != EOF) {
 		*(input++) = c;
+		printf("%d",c);
 	}
+	
 
 	fclose(f);
 }

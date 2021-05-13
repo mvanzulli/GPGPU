@@ -1,5 +1,5 @@
 [0] Config.pm:304> INFO - This is Biber 2.14 (beta)
 [0] Config.pm:307> INFO - Logfile is 'Apuntes programaciÃ³n CUDA.blg'
-[89] biber:322> INFO - === mar abr 27, 2021, 10:45:49
-[198] Utils.pm:309> ERROR - Cannot find 'Apuntes programaciÃ³n CUDA.bcf'!
-[198] Biber.pm:132> INFO - ERRORS: 1
+[82] biber:322> INFO - === lun may 10, 2021, 15:23:11
+[235] Utils.pm:309> ERROR - Cannot find 'Apuntes programaciÃ³n CUDA.bcf'!
+[235] Biber.pm:132> INFO - ERRORS: 1
