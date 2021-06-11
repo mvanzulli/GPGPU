@@ -165,4 +165,33 @@ Consiste realizar resultados intermedios en GPU en memoria compartida para luego
 Para reservar memoria compartida se pude hacer con $\_\_shared\_\_$ tipo y la variable y cantidad de bytes. O $extern\_\_shared\_\_$ que cuando se llama al kernel se indica que tamaño de memoria que deseamos reservar para su ejecución. 
 
 El $syncthreads$ sincorniza y garatniza que todos los hilos hayan terminado esas operaciones antes de avanzar en el códiog. Un error ocurre si se ejecuta el $syncthreads$ dentro de una codnción condicional porque no va a entrar y va a quedar esperando que todos terminen y esto nunca sucede. 
+
+\subparagraph{Stencil}
+Se utiliza cuando se busca actualizar un valor sobre determinada grilla, la traducción textual sería ``plantilla". Suele aplicarse cuando existe un determinado proyecto iterativo en que se debe modificar el valor del pixel de acuerdo a un determinado algoritmo constante.Ej resolución de problemas en derivadas parciales, Gauss-Seidel, procesamiento de imágenes. Este patrón se encuentra en auge ya que es usual en redes neuronales, también en convoluciones (productos compuestos). 
+
+La iniciativa de optimización esta ligada a la reutilización de datos desde  los diferentes \emph{threads} (ej: ir a buscar a la MemGlob el valor de la máscara). Se puede copiar los datos a memoria local utilizando \emph{tiling}.
+
+Hay que estudiar cuantos elementos necesita cada bloque, para el caso de la mascara eso se calcula para el primer y último pixel del tile. El tile de entrada puede ser diferente al de salida, ej si necesito 128 elementos de salida necesito 132 elementos de entrada. Eso determina el tamaño del bloque según las siguientes alternativas:
+\begin{enumerate}
+	\item Que los threads recordan el tile de salida, osea para cada hilo se impacta en el valor de salida. Consecuentemente como el tile de entrada es más grande que el de salida algunos hilos van tener que cargar en memoria más de un elemento.
+	\item Antagónico al anterior, osea tengo tantos hilos como las dimensiones del tile de entrada. En este caso hay hilos que no participan en los elementos de salida
+\end{enumerate}  
+
+Para esta estrategia de computo se puede utilizar la memoria constante que utiliza el cache de la GPU, otra opción es realizar una carga local en la shared memory de la mascara. 
+
+\paragraph{scan}
+Es un algoritmo comumnente utilizado y analizado en la computación paralela que tiene la propiedad de asociativa y hace una especie de composición en los contiguos. Es un método iterativo y secuencial, en determinada posición se aplica una función entre el acumulado de salida y el valor de esa posición de entrada. 
+
+Al programarlo de una manera muy lineal puede producir un balance de carga ya que el último hilo tiene un trabajo abismalmente mayor que los primeros.
+
+\subsection{Clase de consulta práctico 4}
+
+\begin{enumerate}
+	\item La memoria global es del orden de Giga y la local es de Kilo. Las memorias más rápidas son mas caras y es más chcica. Es análogo al cache con la CPU, las memorias más veloces van dentro del procesador y las mas lentas y grandes fuera.
+	\item Dentro del multi-procesador estan los CudaCores los registros y la memoria local. Las arqutecturas tienen una eficiente integrada donde lo ideal es que para disminuir las latencias los diferentes warps se van ejecutando mientras uno lee dentro del mismo MP. Por eso a veces rinde mas tener bloques más chicos porque te entran más warps por MP y la idea es que siempre los MP esten trabajo, esto se ajusta expreimentalmente. 
+	\item La memoria compartida se organiza en 32 bancos de 4 bytes, porque los warps se componene de 32 threads. Lo ideal es que cada hilo lea en un banco distitno así pueden hacerlo en paralelo. Cuando un warp lea 32 pixeles contiguos en la imagen (en filas) eso se va a ir a buscar a bancos contiguos en paraelelo (En un ciclo de reloj todos los threads van a obtener su dato porque la memoria compartida tiene una latencia de 34 byts por ciclo de reloj por segund "Revisar" )
+	El problema es cuando el thread 0 y el 32 acceden al mimsmo banco entonces se va a serializar el acceso esto se llama conflicto de bancos (dos hilos del mismo warp quieren acceder al mismo dato entonces el hardware los ordena serial). " Como es un chip solo dos solicitaciones dentro de un mismo warp tienen que hacerse de forma serial". La excepción es cuando esos threads necesitan el mismo dato, ahi se hace un broadcast y no hay conflicto.
+	\item Dos datos contiguos van a datos contiguos 
+\end{enumerate}
+
 \end{document}
