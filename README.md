@@ -1,2 +1,2 @@
 # GPGPU
-A repository with all the files requierd by Graphical Programing for General Propuse Units. 
+A repository with  files for dydactical propuse to learn CUDAC Grphic Programing for General Propuse Units. This work was carried out in [GPU FING course](https://eva.fing.edu.uy/course/view.php?id=1076)
